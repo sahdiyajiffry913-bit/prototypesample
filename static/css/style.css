@@ -1,0 +1,121 @@
+/* uilingo - simple prototype styles */
+
+body {
+  font-family: Arial, sans-serif;
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 0 16px;
+  color: #222;
+  background: #f5f5f5;
+}
+
+h1 {
+  margin-top: 0;
+}
+
+a {
+  color: #0645ad;
+}
+
+.box {
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+label span {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+input,
+select {
+  width: 100%;
+  max-width: 320px;
+  padding: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+button {
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.hint {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 16px;
+}
+
+.footer-line {
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+/* only show admin secret row when .show is toggled by JS */
+#admin-code-wrap {
+  display: none;
+  margin-top: 8px;
+  padding: 12px;
+  background: #fafafa;
+  border: 1px dashed #999;
+  max-width: 320px;
+}
+
+#admin-code-wrap.show {
+  display: block;
+}
+
+/* flash messages */
+.flash-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.flash {
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+}
+
+.flash--success {
+  background: #e8f5e9;
+}
+
+.flash--error {
+  background: #ffebee;
+}
+
+.flash--warning {
+  background: #fff8e1;
+}
+
+.flash--info {
+  background: #e3f2fd;
+}
+
+/* dashboard */
+.dash-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dash-top h1 {
+  font-size: 22px;
+  margin: 0;
+}

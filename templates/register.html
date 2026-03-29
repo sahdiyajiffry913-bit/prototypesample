@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Sign up - uilingo{% endblock %}
+
+{% block content %}
+<h1>uilingo</h1>
+
+<div class="box">
+  <h2>Sign up</h2>
+  <p class="hint">Pick username, password, and role.</p>
+
+  <form method="post" action="{{ url_for('register') }}">
+    <label>
+      <span>Username</span>
+      <input type="text" name="username" required autocomplete="username"
+        value="{{ request.form.username or '' }}">
+    </label>
+    <label>
+      <span>Password</span>
+      <input type="password" name="password" required autocomplete="new-password" minlength="6">
+    </label>
+    <label>
+      <span>Role</span>
+      <select name="role" id="role-select" required>
+        <option value="" disabled {% if not request.form.role %}selected{% endif %}>-- choose --</option>
+        <option value="student" {% if request.form.role == 'student' %}selected{% endif %}>Student</option>
+        <option value="lecturer" {% if request.form.role == 'lecturer' %}selected{% endif %}>Lecturer</option>
+        <option value="admin" {% if request.form.role == 'admin' %}selected{% endif %}>Admin</option>
+      </select>
+    </label>
+
+    <div id="admin-code-wrap">
+      <label>
+        <span>Admin secret code</span>
+        <input type="password" name="admin_code" id="admin-code" autocomplete="off"
+          placeholder="Only when signing up as Admin" disabled>
+      </label>
+    </div>
+
+    <button type="submit">Create account</button>
+  </form>
+
+  <p class="footer-line">Already have an account? <a href="{{ url_for('login') }}">Log in</a></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/register.js') }}"></script>
+{% endblock %}
