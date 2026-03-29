@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Activities - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Activities (PDF uploads)</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('lecturer_dashboard') }}">Back</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. Upload past papers or other PDFs. Only <strong>.pdf</strong> files.</p>
+
+  <form method="post" action="{{ url_for('lecturer_activities') }}" enctype="multipart/form-data">
+    <label>
+      <span>Title (shown in the list)</span>
+      <input type="text" name="title" required maxlength="200" placeholder="e.g. CS101 Final 2024">
+    </label>
+    <label>
+      <span>PDF file</span>
+      <input type="file" name="file" accept=".pdf,application/pdf" required>
+    </label>
+    <button type="submit">Upload</button>
+  </form>
+</div>
+
+<div class="box box--table">
+  <h2>Your uploads</h2>
+  {% if not activities %}
+  <p class="hint">Nothing uploaded yet.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Original file</th>
+          <th>Uploaded</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in activities %}
+        <tr>
+          <td>{{ a.title }}</td>
+          <td>{{ a.original_filename }}</td>
+          <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '' }}</td>
+          <td><a href="{{ url_for('lecturer_activity_download', activity_id=a.id) }}">Download</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

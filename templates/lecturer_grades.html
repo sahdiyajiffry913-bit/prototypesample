@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Grades - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Student grades</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('lecturer_dashboard') }}">Back</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. Choose a <strong>student</strong> account, then enter the assignment and scores. Saving again for the same student + assignment updates the row.</p>
+
+  {% if not students %}
+  <p class="hint">There are no student accounts yet. Register users with role “Student” first.</p>
+  {% else %}
+  <form method="post" action="{{ url_for('lecturer_grades') }}">
+    <label>
+      <span>Student</span>
+      <select name="student_id" required>
+        <option value="">-- pick student --</option>
+        {% for s in students %}
+        <option value="{{ s.id }}">{{ s.username }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Assignment name</span>
+      <input type="text" name="assignment" required maxlength="200" placeholder="e.g. Midterm quiz">
+    </label>
+    <label>
+      <span>Score</span>
+      <input type="number" name="score" required step="any" placeholder="e.g. 42">
+    </label>
+    <label>
+      <span>Max score (optional, default 100)</span>
+      <input type="number" name="max_score" step="any" placeholder="100">
+    </label>
+    <button type="submit">Save grade</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="box box--table wide">
+  <h2>Grades you entered</h2>
+  {% if not grades %}
+  <p class="hint">No grades yet.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Assignment</th>
+          <th>Score</th>
+          <th>Last updated</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in grades %}
+        {% set stu = students_by_id.get(g.student_id) %}
+        <tr>
+          <td>{{ stu.username if stu else g.student_id }}</td>
+          <td>{{ g.assignment_name }}</td>
+          <td>{{ g.score }} / {{ g.max_score }}</td>
+          <td>{{ g.created_at.strftime('%Y-%m-%d %H:%M') if g.created_at else '' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

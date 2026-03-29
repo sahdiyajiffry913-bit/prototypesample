@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Glossary - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Glossary</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('lecturer_dashboard') }}">Back</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. Type a term and what it means. If you use the same term again, the definition is replaced.</p>
+
+  <form method="post" action="{{ url_for('lecturer_glossary_add') }}">
+    <label>
+      <span>Term</span>
+      <input type="text" name="term" required maxlength="255" placeholder="e.g. Algorithm">
+    </label>
+    <label>
+      <span>Definition</span>
+      <textarea name="definition" rows="4" required maxlength="10000" placeholder="Short explanation for students"></textarea>
+    </label>
+    <button type="submit">Add to glossary</button>
+  </form>
+</div>
+
+<div class="box wide">
+  <h2>Your glossary</h2>
+  {% if not terms %}
+  <p class="hint">No terms yet.</p>
+  {% else %}
+  <dl class="glossary-list">
+    {% for t in terms %}
+    <dt>{{ t.term }}</dt>
+    <dd>{{ t.definition }}</dd>
+    {% endfor %}
+  </dl>
+  {% endif %}
+</div>
+{% endblock %}

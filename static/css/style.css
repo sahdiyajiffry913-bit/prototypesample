@@ -36,12 +36,14 @@ label span {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   max-width: 320px;
   padding: 8px;
   font-size: 14px;
   box-sizing: border-box;
+  font-family: Arial, sans-serif;
 }
 
 button {
@@ -173,4 +175,24 @@ button {
 .muted {
   color: #666;
   font-size: 13px;
+}
+
+.link-list {
+  line-height: 1.8;
+  padding-left: 1.2rem;
+}
+
+code {
+  font-size: 13px;
+  background: #eee;
+  padding: 1px 4px;
+}
+
+.glossary-list dt {
+  font-weight: bold;
+  margin-top: 12px;
+}
+
+.glossary-list dd {
+  margin: 4px 0 0 1rem;
 }

@@ -25,3 +25,40 @@ CREATE TABLE IF NOT EXISTS `user` (
 -- If you already have a `user` table with a plain `password` column, migrate e.g.:
 -- ALTER TABLE `user` ADD COLUMN password_hash VARCHAR(255) NULL AFTER username;
 -- (backfill hashes from your app, then DROP COLUMN password;)
+
+CREATE TABLE IF NOT EXISTS activity_upload (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lecturer_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  stored_filename VARCHAR(255) NOT NULL,
+  original_filename VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_activity_lecturer (lecturer_id),
+  CONSTRAINT fk_activity_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS grade_entry (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lecturer_id INT NOT NULL,
+  student_id INT NOT NULL,
+  assignment_name VARCHAR(200) NOT NULL,
+  score FLOAT NOT NULL,
+  max_score FLOAT NOT NULL DEFAULT 100,
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_grade_lecturer_student_assignment (lecturer_id, student_id, assignment_name),
+  KEY idx_grade_lecturer (lecturer_id),
+  KEY idx_grade_student (student_id),
+  CONSTRAINT fk_grade_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE,
+  CONSTRAINT fk_grade_student FOREIGN KEY (student_id) REFERENCES user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS glossary_entry (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lecturer_id INT NOT NULL,
+  term VARCHAR(255) NOT NULL,
+  definition TEXT NOT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_glossary_lecturer_term (lecturer_id, term),
+  KEY idx_glossary_lecturer (lecturer_id),
+  CONSTRAINT fk_glossary_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

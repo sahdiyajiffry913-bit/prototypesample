@@ -9,6 +9,11 @@
 
 <div class="box">
   <p>Hello, <strong>{{ username }}</strong>.</p>
-  <p>Lecturer home page (prototype).</p>
+  <p class="hint">Pick a task below.</p>
+  <ul class="link-list">
+    <li><a href="{{ url_for('lecturer_activities') }}">Upload activities (PDFs — past papers, handouts)</a></li>
+    <li><a href="{{ url_for('lecturer_grades') }}">Enter student grades</a></li>
+    <li><a href="{{ url_for('lecturer_glossary') }}">Glossary (terms and definitions)</a></li>
+  </ul>
 </div>
 {% endblock %}
