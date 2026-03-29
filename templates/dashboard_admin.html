@@ -9,6 +9,9 @@
 
 <div class="box">
   <p>Hello, <strong>{{ username }}</strong>.</p>
-  <p>Admin home page (prototype).</p>
+  <p class="hint">Manage accounts and see who uses uilingo.</p>
+  <form method="get" action="{{ url_for('admin_users') }}" class="inline-form">
+    <button type="submit">View all users</button>
+  </form>
 </div>
 {% endblock %}

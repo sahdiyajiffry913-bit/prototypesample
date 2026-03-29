@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}All users - uilingo{% endblock %}
+
+{% block content %}
+<div class="wide">
+  <div class="dash-top">
+    <h1>All users</h1>
+    <div class="dash-links">
+      <a href="{{ url_for('admin_dashboard') }}">Back to admin home</a>
+      <a href="{{ url_for('logout') }}">Log out</a>
+    </div>
+  </div>
+
+  <div class="box box--table">
+    <p class="hint">Signed in as <strong>{{ username }}</strong>. Blocked users cannot log in.</p>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Username</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.username }}</td>
+            <td>{{ u.role }}</td>
+            <td>{% if u.is_blocked %}Blocked{% else %}Active{% endif %}</td>
+            <td>
+              {% if u.id == me_id %}
+                <span class="muted">—</span>
+              {% elif u.is_blocked %}
+                <form class="inline-form" method="post" action="{{ url_for('admin_unblock_user', user_id=u.id) }}">
+                  <button type="submit">Unblock</button>
+                </form>
+              {% else %}
+                <form class="inline-form" method="post" action="{{ url_for('admin_block_user', user_id=u.id) }}">
+                  <button type="submit">Block user</button>
+                </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

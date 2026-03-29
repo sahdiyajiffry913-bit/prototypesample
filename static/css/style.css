@@ -119,3 +119,58 @@ button {
   font-size: 22px;
   margin: 0;
 }
+
+.dash-links {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.wide {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.box--table {
+  overflow-x: auto;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+  border: 1px solid #ccc;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.data-table th {
+  background: #eee;
+}
+
+.data-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.inline-form {
+  display: inline;
+  margin: 0;
+}
+
+.inline-form button {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.muted {
+  color: #666;
+  font-size: 13px;
+}

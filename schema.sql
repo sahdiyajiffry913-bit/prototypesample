@@ -14,9 +14,13 @@ CREATE TABLE IF NOT EXISTS `user` (
   username VARCHAR(80) NOT NULL,
   password VARCHAR(255) NOT NULL,
   role VARCHAR(20) NOT NULL,
+  is_blocked TINYINT(1) NOT NULL DEFAULT 0,
   UNIQUE KEY uq_user_username (username),
   KEY idx_user_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Add block flag if your table was created earlier without it:
+-- ALTER TABLE `user` ADD COLUMN is_blocked TINYINT(1) NOT NULL DEFAULT 0;
 
 -- If you already have a `user` table with a plain `password` column, migrate e.g.:
 -- ALTER TABLE `user` ADD COLUMN password_hash VARCHAR(255) NULL AFTER username;

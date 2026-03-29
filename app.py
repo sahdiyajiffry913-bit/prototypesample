@@ -27,6 +27,7 @@ class User(db.Model):
     # DB column is "password" (stores werkzeug hash); Python name stays password_hash
     password_hash = db.Column("password", db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False)
+    is_blocked = db.Column(db.Boolean, nullable=False, default=False)
 
     def set_password(self, raw: str) -> None:
         self.password_hash = generate_password_hash(raw)
@@ -40,6 +41,11 @@ def login_required(view):
     def wrapped(*args, **kwargs):
         if "user_id" not in session:
             flash("Please log in to continue.", "warning")
+            return redirect(url_for("login"))
+        user = db.session.get(User, session["user_id"])
+        if user is None or user.is_blocked:
+            session.clear()
+            flash("Your account is disabled or no longer exists. Please contact an admin.", "error")
             return redirect(url_for("login"))
         return view(*args, **kwargs)
 
@@ -98,6 +104,10 @@ def login():
     user = User.query.filter_by(username=username).first()
     if not user or not user.check_password(password):
         flash("Invalid username or password.", "error")
+        return render_template("login.html"), 200
+
+    if user.is_blocked:
+        flash("This account has been blocked. Contact an administrator.", "error")
         return render_template("login.html"), 200
 
     session.clear()
@@ -187,6 +197,50 @@ def admin_dashboard():
         "dashboard_admin.html",
         username=session.get("username"),
     )
+
+
+@app.route("/admin/users")
+@login_required
+@role_required("admin")
+def admin_users():
+    users = User.query.order_by(User.id).all()
+    return render_template(
+        "admin_users.html",
+        username=session.get("username"),
+        users=users,
+        me_id=session["user_id"],
+    )
+
+
+@app.route("/admin/users/<int:user_id>/block", methods=["POST"])
+@login_required
+@role_required("admin")
+def admin_block_user(user_id):
+    if user_id == session["user_id"]:
+        flash("You cannot block your own account.", "error")
+        return redirect(url_for("admin_users"))
+    target = db.session.get(User, user_id)
+    if not target:
+        flash("User not found.", "error")
+        return redirect(url_for("admin_users"))
+    target.is_blocked = True
+    db.session.commit()
+    flash(f"User “{target.username}” is now blocked and cannot log in.", "success")
+    return redirect(url_for("admin_users"))
+
+
+@app.route("/admin/users/<int:user_id>/unblock", methods=["POST"])
+@login_required
+@role_required("admin")
+def admin_unblock_user(user_id):
+    target = db.session.get(User, user_id)
+    if not target:
+        flash("User not found.", "error")
+        return redirect(url_for("admin_users"))
+    target.is_blocked = False
+    db.session.commit()
+    flash(f"User “{target.username}” can log in again.", "success")
+    return redirect(url_for("admin_users"))
 
 
 @app.cli.command("init-db")
