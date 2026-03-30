@@ -62,3 +62,16 @@ CREATE TABLE IF NOT EXISTS glossary_entry (
   KEY idx_glossary_lecturer (lecturer_id),
   CONSTRAINT fk_glossary_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS student_message (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sender_id INT NOT NULL,
+  recipient_id INT NOT NULL,
+  message_text TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_student_message_sender (sender_id),
+  KEY idx_student_message_recipient (recipient_id),
+  KEY idx_student_message_created (created_at),
+  CONSTRAINT fk_student_message_sender FOREIGN KEY (sender_id) REFERENCES user (id) ON DELETE CASCADE,
+  CONSTRAINT fk_student_message_recipient FOREIGN KEY (recipient_id) REFERENCES user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

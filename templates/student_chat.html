@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Chat - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Chat with peers</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('student_dashboard') }}">Back</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box chat-card">
+  <h2>Select a student</h2>
+  <form method="get" action="{{ url_for('student_chat') }}">
+    <label>
+      <span>Chat with</span>
+      <select name="to_id" required>
+        <option value="" {% if not selected_to_id %}selected{% endif %}>-- pick student --</option>
+        {% for s in students %}
+          {% if s.id != me_id %}
+          <option value="{{ s.id }}" {% if selected_to_id == s.id %}selected{% endif %}>
+            {{ s.username }}
+          </option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Open chat</button>
+  </form>
+</div>
+
+{% if peer %}
+<div class="box chat-card">
+  <h2>Thread with {{ peer.username }}</h2>
+
+  <div class="chat-log" id="chat-log" aria-live="polite">
+    {% if not messages %}
+      <p class="hint">No messages yet. Say hello!</p>
+    {% else %}
+      {% for m in messages %}
+        {% set is_self = (m.sender_id == me_id) %}
+        <div class="chat-bubble chat-bubble--{{ 'user' if is_self else 'ai' }}">
+          <div class="muted">
+            {{ students_by_id.get(m.sender_id).username if students_by_id.get(m.sender_id) else m.sender_id }}
+          </div>
+          <div>{{ m.message_text }}</div>
+          <div class="muted" style="font-size:12px;margin-top:4px;">
+            {{ m.created_at.strftime('%Y-%m-%d %H:%M') if m.created_at else '' }}
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <form class="chat-form" method="post" action="{{ url_for('student_chat_send') }}">
+    <input type="hidden" name="to_id" value="{{ peer.id }}">
+    <input
+      type="text"
+      name="message"
+      required
+      maxlength="2000"
+      placeholder="Type your message..."
+    />
+    <button type="submit">Send</button>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}
+

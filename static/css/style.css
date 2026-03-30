@@ -196,3 +196,60 @@ code {
 .glossary-list dd {
   margin: 4px 0 0 1rem;
 }
+
+/* Chat assistant */
+.chat-card {
+  text-align: left;
+}
+
+.chat-log {
+  border: 1px solid #ddd;
+  background: #fafafa;
+  padding: 12px;
+  height: 220px;
+  overflow: auto;
+  margin-bottom: 12px;
+}
+
+.chat-bubble {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin: 8px 0;
+  max-width: 85%;
+  word-wrap: break-word;
+}
+
+.chat-bubble--user {
+  background: #e3f2fd;
+  margin-left: auto;
+}
+
+.chat-bubble--ai {
+  background: #e8f5e9;
+  margin-right: auto;
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+}
+
+.chat-form input {
+  flex: 1;
+  max-width: none;
+}
+
+/* Thread chat */
+.chat-card textarea,
+.chat-card input[type="text"] {
+  max-width: none;
+}
+
+.chat-thread {
+  margin-top: 12px;
+}
+
+.chat-thread textarea {
+  resize: vertical;
+}

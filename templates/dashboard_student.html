@@ -9,6 +9,93 @@
 
 <div class="box">
   <p>Hello, <strong>{{ username }}</strong>.</p>
-  <p>Student home page (prototype).</p>
+  <p class="hint">
+    Use the assistant below to improve your English sentences.
+  </p>
 </div>
+
+<div class="box chat-card">
+  <h2>English Assistant (prototype)</h2>
+  <div class="chat-log" id="chat-log" aria-live="polite"></div>
+
+  <form class="chat-form" id="chat-form">
+    <input
+      type="text"
+      id="chat-input"
+      name="message"
+      required
+      placeholder="Type an English sentence..."
+    />
+    <button type="submit">Send</button>
+  </form>
+
+  <p class="hint">
+    This is rule-based (not a real AI). It tries basic grammar fixes like capitalization, typos, and a/an.
+  </p>
+</div>
+
+<div class="box">
+  <p class="hint">Click <strong>Resources</strong> to see activities, glossary, and your grades.</p>
+  <ul class="link-list">
+    <li><a href="{{ url_for('student_resources') }}">Resources</a></li>
+    <li><a href="{{ url_for('student_chat') }}">Chat with peers</a></li>
+  </ul>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var form = document.getElementById("chat-form");
+    var input = document.getElementById("chat-input");
+    var log = document.getElementById("chat-log");
+
+    function addBubble(text, kind) {
+      var div = document.createElement("div");
+      div.className = "chat-bubble chat-bubble--" + kind;
+      div.textContent = text;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    async function handleSubmit(e) {
+      e.preventDefault();
+      var message = (input.value || "").trim();
+      if (!message) return;
+
+      addBubble(message, "user");
+      input.value = "";
+
+      addBubble("Correcting...", "ai");
+
+      try {
+        var res = await fetch("{{ url_for('student_assistant_correct') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: message })
+        });
+
+        var data = await res.json();
+        var corrected = data.corrected || data.error || "";
+
+        // remove the "Correcting..." last bubble
+        var bubbles = log.querySelectorAll(".chat-bubble--ai");
+        if (bubbles.length) {
+          log.removeChild(bubbles[bubbles.length - 1]);
+        }
+
+        addBubble(corrected, "ai");
+      } catch (err) {
+        // remove the "Correcting..." last bubble
+        var bubblesErr = log.querySelectorAll(".chat-bubble--ai");
+        if (bubblesErr.length) {
+          log.removeChild(bubblesErr[bubblesErr.length - 1]);
+        }
+        addBubble("Sorry, something went wrong.", "ai");
+      }
+    }
+
+    if (form) form.addEventListener("submit", handleSubmit);
+  })();
+</script>
 {% endblock %}

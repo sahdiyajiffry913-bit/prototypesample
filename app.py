@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from functools import wraps
@@ -39,6 +40,70 @@ def allowed_activity_filename(filename):
         return False
     ext = filename.rsplit(".", 1)[1].lower()
     return ext in ALLOWED_ACTIVITY_EXT
+
+
+def rule_based_correct_english(text: str) -> str:
+    """
+    Very small "AI-like" rule-based English correction for prototypes.
+    No database writes, no history storage.
+    """
+    if text is None:
+        return ""
+
+    s = str(text).replace("\u2019", "'")
+    s = re.sub(r"\s+", " ", s).strip()
+    if not s:
+        return s
+
+    # Common typos
+    s = re.sub(r"\bteh\b", "the", s, flags=re.I)
+    s = re.sub(r"\brecieve\b", "receive", s, flags=re.I)
+
+    # Capitalize first letter (first alphabetic char)
+    m = re.search(r"[A-Za-z]", s)
+    if m:
+        idx = m.start()
+        if s[idx].islower():
+            s = s[:idx] + s[idx].upper() + s[idx + 1 :]
+
+    # Fix standalone "i" -> "I"
+    s = re.sub(r"(^|[\s])i(?=[\s,.!?])", r"\1I", s, flags=re.I)
+
+    # Contractions
+    s = re.sub(r"\bdont\b", "don't", s, flags=re.I)
+    s = re.sub(r"\bcant\b", "can't", s, flags=re.I)
+    s = re.sub(r"\bwont\b", "won't", s, flags=re.I)
+    s = re.sub(r"\bdidnt\b", "didn't", s, flags=re.I)
+    s = re.sub(r"\bdoesnt\b", "doesn't", s, flags=re.I)
+    s = re.sub(r"\bisnt\b", "isn't", s, flags=re.I)
+    s = re.sub(r"\barent\b", "aren't", s, flags=re.I)
+    s = re.sub(r"\bwasnt\b", "wasn't", s, flags=re.I)
+    s = re.sub(r"\bim\b", "I'm", s, flags=re.I)
+
+    # Fix a/an based on first letter after the article (prototype rule)
+    def fix_a_an(match: re.Match) -> str:
+        a_or_an = match.group(1).lower()
+        first_letter = match.group(2)
+        is_vowel = first_letter.lower() in "aeiou"
+        correct_article = "an" if is_vowel else "a"
+        return f"{correct_article} {first_letter}"
+
+    s = re.sub(r"\b(a|an)\s+([A-Za-z])", fix_a_an, s, flags=re.I)
+
+    # Common grammar mistakes
+    s = re.sub(r"\bI has\b", "I have", s, flags=re.I)
+    s = re.sub(r"\byou was\b", "you were", s, flags=re.I)
+    s = re.sub(r"\bthey was\b", "they were", s, flags=re.I)
+
+    # End punctuation: add ? for question words, otherwise add a period
+    if s and s[-1] not in ".!?":
+        lower = s.lower()
+        if re.match(r"^(what|where|when|why|how)\b", lower):
+            s = s + "?"
+        else:
+            s = s + "."
+
+    return s
 
 ADMIN_SIGNUP_SECRET = "123"
 ROLES = frozenset({"student", "lecturer", "admin"})
@@ -102,6 +167,16 @@ class GlossaryEntry(db.Model):
     lecturer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     term = db.Column(db.String(255), nullable=False)
     definition = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+
+
+class StudentMessage(db.Model):
+    __tablename__ = "student_message"
+
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    recipient_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    message_text = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
 
 
@@ -248,6 +323,114 @@ def student_dashboard():
     )
 
 
+@app.route("/student/resources")
+@login_required
+@role_required("student")
+def student_resources():
+    student_id = session["user_id"]
+
+    activities = (
+        ActivityUpload.query.order_by(ActivityUpload.created_at.desc()).all()
+    )
+    grades = (
+        GradeEntry.query.filter_by(student_id=student_id)
+        .order_by(GradeEntry.created_at.desc())
+        .all()
+    )
+    glossary_terms = GlossaryEntry.query.order_by(GlossaryEntry.term.asc()).all()
+    lecturers = User.query.filter_by(role="lecturer").all()
+    lecturers_by_id = {u.id: u for u in lecturers}
+
+    return render_template(
+        "student_resources.html",
+        username=session.get("username"),
+        activities=activities,
+        grades=grades,
+        glossary_terms=glossary_terms,
+        lecturers_by_id=lecturers_by_id,
+    )
+
+
+@app.route("/student/chat")
+@login_required
+@role_required("student")
+def student_chat():
+    me_id = session["user_id"]
+    students = User.query.filter_by(role="student").order_by(User.username).all()
+    students_by_id = {u.id: u for u in students}
+
+    to_id = request.args.get("to_id", type=int)
+    peer = None
+    messages = []
+
+    if to_id:
+        peer = db.session.get(User, to_id)
+        if not peer or peer.role != "student" or peer.id == me_id:
+            flash("Pick a valid student to chat with.", "error")
+            return redirect(url_for("student_chat"))
+
+        messages = (
+            StudentMessage.query.filter(
+                (
+                    (StudentMessage.sender_id == me_id)
+                    & (StudentMessage.recipient_id == to_id)
+                )
+                | (
+                    (StudentMessage.sender_id == to_id)
+                    & (StudentMessage.recipient_id == me_id)
+                )
+            )
+            .order_by(StudentMessage.created_at.desc())
+            .limit(20)
+            .all()
+        )
+        messages = list(reversed(messages))
+
+    return render_template(
+        "student_chat.html",
+        username=session.get("username"),
+        students=students,
+        students_by_id=students_by_id,
+        peer=peer,
+        messages=messages,
+        me_id=me_id,
+        selected_to_id=to_id,
+    )
+
+
+@app.route("/student/chat/send", methods=["POST"])
+@login_required
+@role_required("student")
+def student_chat_send():
+    me_id = session["user_id"]
+    to_id = request.form.get("to_id", type=int)
+    message = (request.form.get("message") or "").strip()
+
+    if not to_id or not message:
+        flash("Pick a student and type your message.", "error")
+        return redirect(url_for("student_chat"))
+
+    if len(message) > 2000:
+        flash("Message is too long (max 2000 characters).", "error")
+        return redirect(url_for("student_chat", to_id=to_id))
+
+    peer = db.session.get(User, to_id)
+    if not peer or peer.role != "student" or peer.id == me_id:
+        flash("Pick a valid student to chat with.", "error")
+        return redirect(url_for("student_chat"))
+
+    row = StudentMessage(
+        sender_id=me_id,
+        recipient_id=to_id,
+        message_text=message,
+    )
+    db.session.add(row)
+    db.session.commit()
+
+    flash("Message sent.", "success")
+    return redirect(url_for("student_chat", to_id=to_id))
+
+
 @app.route("/lecturer/dashboard")
 @login_required
 @role_required("lecturer")
@@ -326,6 +509,47 @@ def lecturer_activity_download(activity_id):
         as_attachment=True,
         download_name=row.original_filename,
     )
+
+
+@app.route("/student/activities/<int:activity_id>/download")
+@login_required
+@role_required("student")
+def student_activity_download(activity_id):
+    row = db.session.get(ActivityUpload, activity_id)
+    if not row:
+        flash("File not found.", "error")
+        return redirect(url_for("student_resources"))
+
+    folder = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        "activities",
+        str(row.lecturer_id),
+    )
+    return send_from_directory(
+        folder,
+        row.stored_filename,
+        as_attachment=True,
+        download_name=row.original_filename,
+    )
+
+
+@app.route("/student/assistant/correct", methods=["POST"])
+@login_required
+@role_required("student")
+def student_assistant_correct():
+    data = request.get_json(silent=True) or {}
+    message = (data.get("message") or "").strip()
+    if not message:
+        message = (request.form.get("message") or "").strip()
+
+    if not message:
+        return {"error": "Message is required."}, 400
+
+    corrected = rule_based_correct_english(message)
+    return {
+        "original": message,
+        "corrected": corrected,
+    }
 
 
 @app.route("/lecturer/grades", methods=["GET", "POST"])

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Resources - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Resources</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('student_dashboard') }}">Back</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box box--table wide">
+  <h2>Activities (PDF)</h2>
+  {% if not activities %}
+    <p class="hint">No activities available yet.</p>
+  {% else %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>File</th>
+            <th>Lecturer</th>
+            <th>Uploaded</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in activities %}
+          <tr>
+            <td>{{ a.title }}</td>
+            <td>
+              <a href="{{ url_for('student_activity_download', activity_id=a.id) }}">
+                {{ a.original_filename }}
+              </a>
+            </td>
+            <td>
+              {% set lect = lecturers_by_id.get(a.lecturer_id) %}
+              {{ lect.username if lect else a.lecturer_id }}
+            </td>
+            <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+<div class="box box--table wide">
+  <h2>Your grades</h2>
+  {% if not grades %}
+    <p class="hint">No grades recorded for you yet.</p>
+  {% else %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Lecturer</th>
+            <th>Assignment</th>
+            <th>Score</th>
+            <th>Last updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for g in grades %}
+          <tr>
+            <td>
+              {% set lect = lecturers_by_id.get(g.lecturer_id) %}
+              {{ lect.username if lect else g.lecturer_id }}
+            </td>
+            <td>{{ g.assignment_name }}</td>
+            <td>{{ g.score }} / {{ g.max_score }}</td>
+            <td>{{ g.created_at.strftime('%Y-%m-%d %H:%M') if g.created_at else '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+<div class="box wide">
+  <h2>Glossary</h2>
+  {% if not glossary_terms %}
+    <p class="hint">No glossary terms available yet.</p>
+  {% else %}
+    <dl class="glossary-list">
+      {% for t in glossary_terms %}
+      <dt>
+        {{ t.term }}
+        {% set lect = lecturers_by_id.get(t.lecturer_id) %}
+        {% if lect %}<span class="muted"> (by {{ lect.username }})</span>{% endif %}
+      </dt>
+      <dd>{{ t.definition }}</dd>
+      {% endfor %}
+    </dl>
+  {% endif %}
+</div>
+{% endblock %}
+
