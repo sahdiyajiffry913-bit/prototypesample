@@ -34,6 +34,28 @@
   </p>
 </div>
 
+<div class="box chat-card">
+  <h2>Translate (English → Tamil / Sinhala)</h2>
+  <p class="hint">
+    Uses the free <strong>MyMemory</strong> translation API (machine translation, not a dictionary). Max 500 characters; quality may vary.
+  </p>
+  <label>
+    <span>English word or phrase</span>
+    <textarea id="translate-input" rows="3" maxlength="500" placeholder="e.g. Good morning"></textarea>
+  </label>
+  <label>
+    <span>Translate to</span>
+    <select id="translate-target">
+      <option value="ta">Tamil</option>
+      <option value="si">Sinhala</option>
+    </select>
+  </label>
+  <p>
+    <button type="button" id="translate-btn">Translate</button>
+  </p>
+  <div class="translate-result" id="translate-result" aria-live="polite"></div>
+</div>
+
 <div class="box">
   <p class="hint">Click <strong>Resources</strong> to see activities, glossary, and your grades.</p>
   <ul class="link-list">
@@ -96,6 +118,41 @@
     }
 
     if (form) form.addEventListener("submit", handleSubmit);
+  })();
+
+  (function () {
+    var btn = document.getElementById("translate-btn");
+    var input = document.getElementById("translate-input");
+    var target = document.getElementById("translate-target");
+    var out = document.getElementById("translate-result");
+
+    async function doTranslate() {
+      if (!btn || !input || !out) return;
+      var text = (input.value || "").trim();
+      if (!text) {
+        out.textContent = "Please enter some English text.";
+        return;
+      }
+      out.textContent = "Translating…";
+      try {
+        var res = await fetch("{{ url_for('student_translate') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: text, target: target ? target.value : "ta" })
+        });
+        var data = await res.json();
+        if (!res.ok) {
+          out.textContent = data.error || "Translation failed.";
+          return;
+        }
+        var label = (data.target === "si") ? "Sinhala" : "Tamil";
+        out.textContent = label + ": " + (data.translated || "");
+      } catch (e) {
+        out.textContent = "Sorry, translation could not be loaded.";
+      }
+    }
+
+    if (btn) btn.addEventListener("click", doTranslate);
   })();
 </script>
 {% endblock %}

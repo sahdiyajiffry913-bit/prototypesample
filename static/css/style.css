@@ -253,3 +253,19 @@ code {
 .chat-thread textarea {
   resize: vertical;
 }
+
+.translate-result {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  background: #fafafa;
+  min-height: 44px;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-card textarea {
+  max-width: none;
+  min-height: 72px;
+}

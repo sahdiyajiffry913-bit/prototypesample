@@ -1,5 +1,9 @@
+import json
 import os
 import re
+import urllib.error
+import urllib.parse
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from functools import wraps
@@ -104,6 +108,48 @@ def rule_based_correct_english(text: str) -> str:
             s = s + "."
 
     return s
+
+
+# Free translation: MyMemory public API (en → ta / si). No API key; rate limits apply.
+MYMEMORY_TRANSLATE_URL = "https://api.mymemory.translated.net/get"
+TRANSLATE_MAX_CHARS = 500
+
+
+def translate_english_to_target(text: str, target_lang: str):
+    """
+    Returns (translated_text, error_message). error_message is None on success.
+    target_lang: 'ta' (Tamil) or 'si' (Sinhala).
+    """
+    if target_lang not in ("ta", "si"):
+        return None, "Invalid target language."
+    t = (text or "").strip()
+    if not t:
+        return None, "Text is required."
+    if len(t) > TRANSLATE_MAX_CHARS:
+        t = t[:TRANSLATE_MAX_CHARS]
+
+    params = urllib.parse.urlencode({"q": t, "langpair": f"en|{target_lang}"})
+    url = f"{MYMEMORY_TRANSLATE_URL}?{params}"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "uilingo/1.0 (Flask student app)"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        return None, f"Translation service unavailable: {exc}"
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None, "Invalid response from translation service."
+
+    status = payload.get("responseStatus")
+    if status not in (200, "200"):
+        err = payload.get("responseDetails") or "Translation failed."
+        return None, str(err)
+
+    data = payload.get("responseData") or {}
+    translated = (data.get("translatedText") or "").strip()
+    if not translated:
+        return None, "No translation returned."
+    return translated, None
+
 
 ADMIN_SIGNUP_SECRET = "123"
 ROLES = frozenset({"student", "lecturer", "admin"})
@@ -550,6 +596,27 @@ def student_assistant_correct():
         "original": message,
         "corrected": corrected,
     }
+
+
+@app.route("/student/translate", methods=["POST"])
+@login_required
+@role_required("student")
+def student_translate():
+    """Proxy to MyMemory: English → Tamil or Sinhala. No DB storage."""
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    target = (data.get("target") or "ta").strip().lower()
+    if not text:
+        text = (request.form.get("text") or "").strip()
+    if not text:
+        return {"error": "Text is required."}, 400
+    if target not in ("ta", "si"):
+        target = "ta"
+
+    translated, err = translate_english_to_target(text, target)
+    if err:
+        return {"error": err}, 400
+    return {"translated": translated, "target": target}
 
 
 @app.route("/lecturer/grades", methods=["GET", "POST"])
