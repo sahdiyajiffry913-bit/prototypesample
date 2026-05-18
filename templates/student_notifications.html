@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Notifications - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Notifications</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('student_dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('student_resources') }}">Resources</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. You are notified when a lecturer uploads a new activity.</p>
+  {% if has_unread %}
+  <form method="post" action="{{ url_for('student_notifications_mark_all_read') }}" class="inline-form">
+    <button type="submit">Mark all as read</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="box wide">
+  {% if not notifications %}
+  <p class="hint">No notifications yet.</p>
+  {% else %}
+  <ul class="notification-list">
+    {% for n in notifications %}
+    <li class="notification-item{% if not n.is_read %} notification-item--unread{% endif %}">
+      <p class="notification-message">{{ n.message }}</p>
+      <p class="notification-meta muted">
+        {{ n.created_at.strftime('%Y-%m-%d %H:%M') if n.created_at else '' }}
+        {% if not n.is_read %}
+        · <strong>Unread</strong>
+        {% endif %}
+      </p>
+      <p class="notification-actions">
+        <a href="{{ url_for('student_resources') }}">View activities</a>
+        {% if not n.is_read %}
+        ·
+        <form method="post" action="{{ url_for('student_notification_mark_read', notification_id=n.id) }}" class="inline-form">
+          <button type="submit">Mark as read</button>
+        </form>
+        {% endif %}
+      </p>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endblock %}

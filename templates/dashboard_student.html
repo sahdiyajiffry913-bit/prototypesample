@@ -4,7 +4,12 @@
 {% block content %}
 <div class="dash-top">
   <h1>Student dashboard</h1>
-  <a href="{{ url_for('logout') }}">Log out</a>
+  <div class="dash-links">
+    <a href="{{ url_for('student_notifications') }}">
+      Notifications{% if unread_notification_count %} ({{ unread_notification_count }} unread){% endif %}
+    </a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
 </div>
 
 <div class="box">
@@ -13,6 +18,8 @@
     Use the assistant below to improve your English sentences.
   </p>
 </div>
+
+{% include "_student_progress.html" %}
 
 <div class="box chat-card">
   <h2>English Assistant (prototype)</h2>
@@ -59,7 +66,9 @@
 <div class="box">
   <p class="hint">Click <strong>Resources</strong> to see activities, glossary, and your grades.</p>
   <ul class="link-list">
-    <li><a href="{{ url_for('student_resources') }}">Resources</a></li>
+    <li><a href="{{ url_for('student_notifications') }}">Notifications{% if unread_notification_count %} — {{ unread_notification_count }} unread{% endif %}</a></li>
+    <li><a href="{{ url_for('student_pastpapers') }}">Past papers (view &amp; download)</a></li>
+    <li><a href="{{ url_for('student_resources') }}">Resources (activities, glossary, grades)</a></li>
     <li><a href="{{ url_for('student_chat') }}">Chat with peers</a></li>
   </ul>
 </div>

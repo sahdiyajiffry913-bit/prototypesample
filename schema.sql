@@ -37,6 +37,31 @@ CREATE TABLE IF NOT EXISTS activity_upload (
   CONSTRAINT fk_activity_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS past_paper_upload (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  lecturer_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  stored_filename VARCHAR(255) NOT NULL,
+  original_filename VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_past_paper_lecturer (lecturer_id),
+  CONSTRAINT fk_past_paper_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS activity_submission (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  activity_id INT NOT NULL,
+  student_id INT NOT NULL,
+  stored_filename VARCHAR(255) NOT NULL,
+  original_filename VARCHAR(255) NOT NULL,
+  submitted_at DATETIME NOT NULL,
+  UNIQUE KEY uq_submission_activity_student (activity_id, student_id),
+  KEY idx_submission_activity (activity_id),
+  KEY idx_submission_student (student_id),
+  CONSTRAINT fk_submission_activity FOREIGN KEY (activity_id) REFERENCES activity_upload (id) ON DELETE CASCADE,
+  CONSTRAINT fk_submission_student FOREIGN KEY (student_id) REFERENCES user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS grade_entry (
   id INT AUTO_INCREMENT PRIMARY KEY,
   lecturer_id INT NOT NULL,
@@ -44,13 +69,22 @@ CREATE TABLE IF NOT EXISTS grade_entry (
   assignment_name VARCHAR(200) NOT NULL,
   score FLOAT NOT NULL,
   max_score FLOAT NOT NULL DEFAULT 100,
+  submission_id INT NULL,
   created_at DATETIME NOT NULL,
   UNIQUE KEY uq_grade_lecturer_student_assignment (lecturer_id, student_id, assignment_name),
+  UNIQUE KEY uq_grade_submission (submission_id),
   KEY idx_grade_lecturer (lecturer_id),
   KEY idx_grade_student (student_id),
   CONSTRAINT fk_grade_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE,
-  CONSTRAINT fk_grade_student FOREIGN KEY (student_id) REFERENCES user (id) ON DELETE CASCADE
+  CONSTRAINT fk_grade_student FOREIGN KEY (student_id) REFERENCES user (id) ON DELETE CASCADE,
+  CONSTRAINT fk_grade_submission FOREIGN KEY (submission_id) REFERENCES activity_submission (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- If grade_entry already exists without submission support:
+-- CREATE TABLE IF NOT EXISTS activity_submission (... same as above ...);
+-- ALTER TABLE grade_entry ADD COLUMN submission_id INT NULL AFTER max_score;
+-- ALTER TABLE grade_entry ADD UNIQUE KEY uq_grade_submission (submission_id);
+-- ALTER TABLE grade_entry ADD CONSTRAINT fk_grade_submission FOREIGN KEY (submission_id) REFERENCES activity_submission (id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS glossary_entry (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -61,6 +95,20 @@ CREATE TABLE IF NOT EXISTS glossary_entry (
   UNIQUE KEY uq_glossary_lecturer_term (lecturer_id, term),
   KEY idx_glossary_lecturer (lecturer_id),
   CONSTRAINT fk_glossary_lecturer FOREIGN KEY (lecturer_id) REFERENCES user (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS notification (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  activity_id INT NOT NULL,
+  message VARCHAR(500) NOT NULL,
+  is_read TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL,
+  KEY idx_notification_user (user_id),
+  KEY idx_notification_read (is_read),
+  KEY idx_notification_activity (activity_id),
+  CONSTRAINT fk_notification_user FOREIGN KEY (user_id) REFERENCES user (id) ON DELETE CASCADE,
+  CONSTRAINT fk_notification_activity FOREIGN KEY (activity_id) REFERENCES activity_upload (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS student_message (

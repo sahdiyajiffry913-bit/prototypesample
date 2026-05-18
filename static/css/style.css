@@ -172,6 +172,83 @@ button {
   font-size: 13px;
 }
 
+.submit-answer-form,
+.inline-grade-form {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.submit-answer-form input[type="file"],
+.inline-grade-form input[type="number"] {
+  max-width: 140px;
+  font-size: 13px;
+}
+
+.submit-answer-form button,
+.inline-grade-form button {
+  padding: 4px 10px;
+  font-size: 13px;
+}
+
+.section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.section-head h2 {
+  margin: 0;
+}
+
+.btn-secondary {
+  display: inline-block;
+  padding: 8px 14px;
+  font-size: 14px;
+  text-decoration: none;
+  color: #222;
+  background: #e8e8e8;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.btn-secondary:hover {
+  background: #ddd;
+}
+
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.notification-item {
+  padding: 12px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.notification-item--unread {
+  background: #f0f7ff;
+  margin: 0 -12px;
+  padding: 12px;
+  border-left: 3px solid #4a90d9;
+}
+
+.notification-message {
+  margin: 0 0 6px;
+}
+
+.notification-meta,
+.notification-actions {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
 .muted {
   color: #666;
   font-size: 13px;
@@ -186,6 +263,107 @@ code {
   font-size: 13px;
   background: #eee;
   padding: 1px 4px;
+}
+
+/* Student progress & performance */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stats-card {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.stats-card__title {
+  margin: 0 0 12px;
+  font-size: 1.1rem;
+}
+
+.stats-card__summary {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: #333;
+}
+
+.stats-card__percent {
+  margin: 10px 0 0;
+  font-size: 14px;
+  font-weight: bold;
+  color: #2a6f9e;
+}
+
+.stats-card__note {
+  margin: 8px 0 0;
+}
+
+.stats-card__grade {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.stats-card__grade strong {
+  color: #1a7a4a;
+}
+
+.stats-card__empty {
+  margin: 0;
+  color: #666;
+  font-size: 15px;
+}
+
+.stats-card--progress .progress-bar {
+  width: 100%;
+  height: 14px;
+  background: #e8eef3;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.stats-card--progress .progress-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b8fd9, #2a6f9e);
+  border-radius: 999px;
+  transition: width 0.35s ease;
+  min-width: 0;
+}
+
+.glossary-search-label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.glossary-search-label span {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.glossary-search-input {
+  width: 100%;
+  max-width: 320px;
+  padding: 8px 10px;
+  font-size: 15px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.glossary-no-results {
+  color: #a33;
+}
+
+.glossary-entry[hidden] {
+  display: none;
+}
+
+.glossary-list .glossary-entry:first-child dt {
+  margin-top: 0;
 }
 
 .glossary-list dt {

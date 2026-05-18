@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Past papers - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Past papers portal</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('lecturer_dashboard') }}">Back</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. Upload past paper PDFs for students to download. No submissions or grading — upload only.</p>
+
+  <form method="post" action="{{ url_for('lecturer_pastpapers') }}" enctype="multipart/form-data">
+    <label>
+      <span>Title (shown in the list)</span>
+      <input type="text" name="title" required maxlength="200" placeholder="e.g. CS101 Final 2023">
+    </label>
+    <label>
+      <span>PDF file</span>
+      <input type="file" name="file" accept=".pdf,application/pdf" required>
+    </label>
+    <button type="submit">Upload past paper</button>
+  </form>
+</div>
+
+<div class="box box--table wide">
+  <h2>Your past paper uploads</h2>
+  {% if not pastpapers %}
+  <p class="hint">Nothing uploaded yet.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>File</th>
+          <th>Uploaded</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pastpapers %}
+        <tr>
+          <td>{{ p.title }}</td>
+          <td>{{ p.original_filename }}</td>
+          <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</td>
+          <td><a href="{{ url_for('lecturer_pastpaper_download', paper_id=p.id) }}">Download</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

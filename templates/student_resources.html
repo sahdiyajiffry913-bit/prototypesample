@@ -6,9 +6,14 @@
   <h1>Resources</h1>
   <div class="dash-links">
     <a href="{{ url_for('student_dashboard') }}">Back</a>
+    <a href="{{ url_for('student_notifications') }}">
+      Notifications{% if unread_notification_count %} ({{ unread_notification_count }}){% endif %}
+    </a>
     <a href="{{ url_for('logout') }}">Log out</a>
   </div>
 </div>
+
+{% include "_student_progress.html" %}
 
 <div class="box box--table wide">
   <h2>Activities (PDF)</h2>
@@ -20,19 +25,33 @@
         <thead>
           <tr>
             <th>Title</th>
-            <th>File</th>
+            <th>Activity PDF</th>
+            <th>Your answer</th>
             <th>Lecturer</th>
             <th>Uploaded</th>
           </tr>
         </thead>
         <tbody>
           {% for a in activities %}
+          {% set sub = submissions_by_activity.get(a.id) %}
           <tr>
             <td>{{ a.title }}</td>
             <td>
               <a href="{{ url_for('student_activity_download', activity_id=a.id) }}">
                 {{ a.original_filename }}
               </a>
+            </td>
+            <td>
+              {% if sub %}
+              <a href="{{ url_for('student_submission_download', submission_id=sub.id) }}">
+                {{ sub.original_filename }}
+              </a>
+              <span class="muted"> ({{ sub.submitted_at.strftime('%Y-%m-%d %H:%M') if sub.submitted_at else '' }})</span>
+              {% endif %}
+              <form method="post" action="{{ url_for('student_activity_submit', activity_id=a.id) }}" enctype="multipart/form-data" class="submit-answer-form">
+                <input type="file" name="file" accept=".pdf,application/pdf" required>
+                <button type="submit">{{ 'Replace PDF' if sub else 'Submit PDF' }}</button>
+              </form>
             </td>
             <td>
               {% set lect = lecturers_by_id.get(a.lecturer_id) %}
@@ -80,22 +99,70 @@
   {% endif %}
 </div>
 
-<div class="box wide">
+<div class="box wide glossary-box">
   <h2>Glossary</h2>
   {% if not glossary_terms %}
     <p class="hint">No glossary terms available yet.</p>
   {% else %}
-    <dl class="glossary-list">
+    <label class="glossary-search-label" for="glossary-search">
+      <span>Search by letter or word</span>
+      <input
+        type="search"
+        id="glossary-search"
+        class="glossary-search-input"
+        placeholder="e.g. A or app..."
+        autocomplete="off"
+        aria-controls="glossary-list"
+        aria-describedby="glossary-search-hint"
+      />
+    </label>
+    <p class="hint" id="glossary-search-hint">Type one or more letters to show terms that start with those letters.</p>
+    <p class="hint glossary-no-results" id="glossary-no-results" hidden>No terms match your search.</p>
+    <dl class="glossary-list" id="glossary-list">
       {% for t in glossary_terms %}
-      <dt>
-        {{ t.term }}
-        {% set lect = lecturers_by_id.get(t.lecturer_id) %}
-        {% if lect %}<span class="muted"> (by {{ lect.username }})</span>{% endif %}
-      </dt>
-      <dd>{{ t.definition }}</dd>
+      <div class="glossary-entry" data-term="{{ t.term|lower }}">
+        <dt>
+          {{ t.term }}
+          {% set lect = lecturers_by_id.get(t.lecturer_id) %}
+          {% if lect %}<span class="muted"> (by {{ lect.username }})</span>{% endif %}
+        </dt>
+        <dd>{{ t.definition }}</dd>
+      </div>
       {% endfor %}
     </dl>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    var input = document.getElementById("glossary-search");
+    var list = document.getElementById("glossary-list");
+    var noResults = document.getElementById("glossary-no-results");
+    if (!input || !list) return;
+
+    var entries = list.querySelectorAll(".glossary-entry");
+
+    function filterGlossary() {
+      var query = (input.value || "").trim().toLowerCase();
+      var visible = 0;
+
+      entries.forEach(function (entry) {
+        var term = entry.getAttribute("data-term") || "";
+        var match = !query || term.indexOf(query) === 0;
+        entry.hidden = !match;
+        if (match) visible += 1;
+      });
+
+      if (noResults) {
+        noResults.hidden = !query || visible > 0;
+      }
+    }
+
+    input.addEventListener("input", filterGlossary);
+    input.addEventListener("search", filterGlossary);
+  })();
+</script>
 {% endblock %}
 

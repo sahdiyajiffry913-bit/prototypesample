@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Past papers - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Past papers</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('student_dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('student_notifications') }}">
+      Notifications{% if unread_notification_count %} ({{ unread_notification_count }}){% endif %}
+    </a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. Browse and download past paper PDFs uploaded by lecturers.</p>
+</div>
+
+<div class="box box--table wide">
+  {% if not pastpapers %}
+  <p class="hint">No past papers available yet.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>File</th>
+          <th>Lecturer</th>
+          <th>Uploaded</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in pastpapers %}
+        <tr>
+          <td>{{ p.title }}</td>
+          <td>{{ p.original_filename }}</td>
+          <td>
+            {% set lect = lecturers_by_id.get(p.lecturer_id) %}
+            {{ lect.username if lect else p.lecturer_id }}
+          </td>
+          <td>{{ p.created_at.strftime('%Y-%m-%d %H:%M') if p.created_at else '' }}</td>
+          <td>
+            <a href="{{ url_for('student_pastpaper_download', paper_id=p.id) }}">Download</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

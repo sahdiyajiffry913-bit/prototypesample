@@ -1,3 +1,5 @@
+import csv
+import io
 import json
 import os
 import re
@@ -8,7 +10,8 @@ import uuid
 from datetime import datetime, timezone
 from functools import wraps
 
-from flask import Flask, flash, redirect, render_template, request, send_from_directory, session, url_for
+from flask import Flask, flash, make_response, redirect, render_template, request, send_from_directory, session, url_for
+from sqlalchemy import func
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -35,8 +38,10 @@ def utc_now():
 
 
 def ensure_upload_dirs():
-    act_root = os.path.join(app.config["UPLOAD_FOLDER"], "activities")
-    os.makedirs(act_root, exist_ok=True)
+    root = app.config["UPLOAD_FOLDER"]
+    os.makedirs(os.path.join(root, "activities"), exist_ok=True)
+    os.makedirs(os.path.join(root, "submissions"), exist_ok=True)
+    os.makedirs(os.path.join(root, "pastpapers"), exist_ok=True)
 
 
 def allowed_activity_filename(filename):
@@ -183,6 +188,35 @@ class ActivityUpload(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
 
 
+class PastPaperUpload(db.Model):
+    __tablename__ = "past_paper_upload"
+
+    id = db.Column(db.Integer, primary_key=True)
+    lecturer_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    title = db.Column(db.String(200), nullable=False)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+
+
+class ActivitySubmission(db.Model):
+    __tablename__ = "activity_submission"
+    __table_args__ = (
+        db.UniqueConstraint(
+            "activity_id",
+            "student_id",
+            name="uq_submission_activity_student",
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    activity_id = db.Column(db.Integer, db.ForeignKey("activity_upload.id"), nullable=False, index=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    stored_filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    submitted_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+
+
 class GradeEntry(db.Model):
     __tablename__ = "grade_entry"
     __table_args__ = (
@@ -200,6 +234,13 @@ class GradeEntry(db.Model):
     assignment_name = db.Column(db.String(200), nullable=False)
     score = db.Column(db.Float, nullable=False)
     max_score = db.Column(db.Float, nullable=False, default=100.0)
+    submission_id = db.Column(
+        db.Integer,
+        db.ForeignKey("activity_submission.id"),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
 
 
@@ -224,6 +265,89 @@ class StudentMessage(db.Model):
     recipient_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
     message_text = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+
+
+class Notification(db.Model):
+    __tablename__ = "notification"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False, index=True)
+    activity_id = db.Column(
+        db.Integer,
+        db.ForeignKey("activity_upload.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    message = db.Column(db.String(500), nullable=False)
+    is_read = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=utc_now)
+
+
+def notify_students_new_activity(activity: ActivityUpload) -> None:
+    """Create an unread notification for every student when a lecturer uploads an activity."""
+    lecturer = db.session.get(User, activity.lecturer_id)
+    lecturer_name = lecturer.username if lecturer else "A lecturer"
+    message = f'{lecturer_name} uploaded a new activity: "{activity.title}"'
+    students = User.query.filter_by(role="student", is_blocked=False).all()
+    for student in students:
+        db.session.add(
+            Notification(
+                user_id=student.id,
+                activity_id=activity.id,
+                message=message,
+            )
+        )
+
+
+def unread_notification_count(user_id: int) -> int:
+    return Notification.query.filter_by(user_id=user_id, is_read=False).count()
+
+
+def student_learning_progress(student_id: int) -> dict:
+    """Activity completion only — not grades."""
+    total = ActivityUpload.query.count()
+    if total == 0:
+        return {
+            "total_activities": 0,
+            "submitted_activities": 0,
+            "completion_percentage": 0.0,
+        }
+    submitted = ActivitySubmission.query.filter_by(student_id=student_id).count()
+    pct = round((submitted / total) * 100, 1)
+    return {
+        "total_activities": total,
+        "submitted_activities": submitted,
+        "completion_percentage": pct,
+    }
+
+
+def student_average_grade_percentage(student_id: int):
+    """Mean of (score / max_score) * 100 across grade entries, or None if none."""
+    grades = GradeEntry.query.filter_by(student_id=student_id).all()
+    if not grades:
+        return None
+    ratios = []
+    for grade in grades:
+        if grade.max_score and grade.max_score > 0:
+            ratios.append(grade.score / grade.max_score)
+    if not ratios:
+        return None
+    return round((sum(ratios) / len(ratios)) * 100, 1)
+
+
+def student_progress_context(student_id: int) -> dict:
+    progress = student_learning_progress(student_id)
+    return {
+        **progress,
+        "average_grade_percentage": student_average_grade_percentage(student_id),
+    }
+
+
+@app.context_processor
+def inject_notification_count():
+    if session.get("role") == "student" and session.get("user_id"):
+        return {"unread_notification_count": unread_notification_count(session["user_id"])}
+    return {"unread_notification_count": 0}
 
 
 def login_required(view):
@@ -363,10 +487,57 @@ def dashboard():
 @login_required
 @role_required("student")
 def student_dashboard():
+    student_id = session["user_id"]
     return render_template(
         "dashboard_student.html",
         username=session.get("username"),
+        **student_progress_context(student_id),
     )
+
+
+@app.route("/student/notifications")
+@login_required
+@role_required("student")
+def student_notifications():
+    student_id = session["user_id"]
+    notifications = (
+        Notification.query.filter_by(user_id=student_id)
+        .order_by(Notification.created_at.desc())
+        .all()
+    )
+    has_unread = any(not n.is_read for n in notifications)
+    return render_template(
+        "student_notifications.html",
+        username=session.get("username"),
+        notifications=notifications,
+        has_unread=has_unread,
+    )
+
+
+@app.route("/student/notifications/<int:notification_id>/read", methods=["POST"])
+@login_required
+@role_required("student")
+def student_notification_mark_read(notification_id):
+    note = db.session.get(Notification, notification_id)
+    if not note or note.user_id != session["user_id"]:
+        flash("Notification not found.", "error")
+        return redirect(url_for("student_notifications"))
+    note.is_read = True
+    db.session.commit()
+    return redirect(url_for("student_notifications"))
+
+
+@app.route("/student/notifications/read-all", methods=["POST"])
+@login_required
+@role_required("student")
+def student_notifications_mark_all_read():
+    Notification.query.filter_by(
+        user_id=session["user_id"],
+        is_read=False,
+    ).update({"is_read": True})
+    db.session.commit()
+    flash("All notifications marked as read.", "success")
+    return redirect(url_for("student_notifications"))
 
 
 @app.route("/student/resources")
@@ -386,6 +557,8 @@ def student_resources():
     glossary_terms = GlossaryEntry.query.order_by(GlossaryEntry.term.asc()).all()
     lecturers = User.query.filter_by(role="lecturer").all()
     lecturers_by_id = {u.id: u for u in lecturers}
+    my_submissions = ActivitySubmission.query.filter_by(student_id=student_id).all()
+    submissions_by_activity = {s.activity_id: s for s in my_submissions}
 
     return render_template(
         "student_resources.html",
@@ -394,6 +567,8 @@ def student_resources():
         grades=grades,
         glossary_terms=glossary_terms,
         lecturers_by_id=lecturers_by_id,
+        submissions_by_activity=submissions_by_activity,
+        **student_progress_context(student_id),
     )
 
 
@@ -523,8 +698,10 @@ def lecturer_activities():
             original_filename=upload.filename,
         )
         db.session.add(row)
+        db.session.flush()
+        notify_students_new_activity(row)
         db.session.commit()
-        flash("Activity PDF uploaded.", "success")
+        flash("Activity PDF uploaded. All students were notified.", "success")
         return redirect(url_for("lecturer_activities"))
 
     activities = (
@@ -557,6 +734,112 @@ def lecturer_activity_download(activity_id):
     )
 
 
+@app.route("/lecturer/pastpapers", methods=["GET", "POST"])
+@login_required
+@role_required("lecturer")
+def lecturer_pastpapers():
+    lecturer_id = session["user_id"]
+    if request.method == "POST":
+        title = (request.form.get("title") or "").strip()
+        upload = request.files.get("file")
+        if not title:
+            flash("Please enter a title for this past paper.", "error")
+            return redirect(url_for("lecturer_pastpapers"))
+        if not upload or not upload.filename:
+            flash("Please choose a PDF file to upload.", "error")
+            return redirect(url_for("lecturer_pastpapers"))
+        if not allowed_activity_filename(upload.filename):
+            flash("Only PDF files are allowed.", "error")
+            return redirect(url_for("lecturer_pastpapers"))
+
+        ensure_upload_dirs()
+        safe = secure_filename(upload.filename)
+        if not safe:
+            flash("Invalid file name.", "error")
+            return redirect(url_for("lecturer_pastpapers"))
+        stored = f"{uuid.uuid4().hex}_{safe}"
+        dest_dir = os.path.join(app.config["UPLOAD_FOLDER"], "pastpapers", str(lecturer_id))
+        os.makedirs(dest_dir, exist_ok=True)
+        upload.save(os.path.join(dest_dir, stored))
+
+        db.session.add(
+            PastPaperUpload(
+                lecturer_id=lecturer_id,
+                title=title,
+                stored_filename=stored,
+                original_filename=upload.filename,
+            )
+        )
+        db.session.commit()
+        flash("Past paper uploaded.", "success")
+        return redirect(url_for("lecturer_pastpapers"))
+
+    papers = (
+        PastPaperUpload.query.filter_by(lecturer_id=lecturer_id)
+        .order_by(PastPaperUpload.created_at.desc())
+        .all()
+    )
+    return render_template(
+        "lecturer_pastpapers.html",
+        username=session.get("username"),
+        pastpapers=papers,
+    )
+
+
+@app.route("/lecturer/pastpapers/<int:paper_id>/download")
+@login_required
+@role_required("lecturer")
+def lecturer_pastpaper_download(paper_id):
+    row = db.session.get(PastPaperUpload, paper_id)
+    lecturer_id = session["user_id"]
+    if not row or row.lecturer_id != lecturer_id:
+        flash("File not found.", "error")
+        return redirect(url_for("lecturer_pastpapers"))
+    folder = os.path.join(app.config["UPLOAD_FOLDER"], "pastpapers", str(lecturer_id))
+    return send_from_directory(
+        folder,
+        row.stored_filename,
+        as_attachment=True,
+        download_name=row.original_filename,
+    )
+
+
+@app.route("/student/pastpapers")
+@login_required
+@role_required("student")
+def student_pastpapers():
+    papers = PastPaperUpload.query.order_by(PastPaperUpload.created_at.desc()).all()
+    lecturers = User.query.filter_by(role="lecturer").all()
+    lecturers_by_id = {u.id: u for u in lecturers}
+    return render_template(
+        "student_pastpapers.html",
+        username=session.get("username"),
+        pastpapers=papers,
+        lecturers_by_id=lecturers_by_id,
+    )
+
+
+@app.route("/student/pastpapers/<int:paper_id>/download")
+@login_required
+@role_required("student")
+def student_pastpaper_download(paper_id):
+    row = db.session.get(PastPaperUpload, paper_id)
+    if not row:
+        flash("File not found.", "error")
+        return redirect(url_for("student_pastpapers"))
+    folder = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        "pastpapers",
+        str(row.lecturer_id),
+    )
+    return send_from_directory(
+        folder,
+        row.stored_filename,
+        as_attachment=True,
+        download_name=row.original_filename,
+    )
+
+
 @app.route("/student/activities/<int:activity_id>/download")
 @login_required
 @role_required("student")
@@ -577,6 +860,336 @@ def student_activity_download(activity_id):
         as_attachment=True,
         download_name=row.original_filename,
     )
+
+
+@app.route("/student/activities/<int:activity_id>/submit", methods=["POST"])
+@login_required
+@role_required("student")
+def student_activity_submit(activity_id):
+    student_id = session["user_id"]
+    activity = db.session.get(ActivityUpload, activity_id)
+    if not activity:
+        flash("Activity not found.", "error")
+        return redirect(url_for("student_resources"))
+
+    upload = request.files.get("file")
+    if not upload or not upload.filename:
+        flash("Please choose a PDF answer file.", "error")
+        return redirect(url_for("student_resources"))
+    if not allowed_activity_filename(upload.filename):
+        flash("Only PDF files are allowed.", "error")
+        return redirect(url_for("student_resources"))
+
+    ensure_upload_dirs()
+    safe = secure_filename(upload.filename)
+    if not safe:
+        flash("Invalid file name.", "error")
+        return redirect(url_for("student_resources"))
+    stored = f"{uuid.uuid4().hex}_{safe}"
+    dest_dir = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        "submissions",
+        str(activity_id),
+        str(student_id),
+    )
+    os.makedirs(dest_dir, exist_ok=True)
+    upload.save(os.path.join(dest_dir, stored))
+
+    existing = ActivitySubmission.query.filter_by(
+        activity_id=activity_id,
+        student_id=student_id,
+    ).first()
+    if existing:
+        existing.stored_filename = stored
+        existing.original_filename = upload.filename
+        existing.submitted_at = utc_now()
+        flash("Answer updated (re-submitted).", "success")
+    else:
+        db.session.add(
+            ActivitySubmission(
+                activity_id=activity_id,
+                student_id=student_id,
+                stored_filename=stored,
+                original_filename=upload.filename,
+            )
+        )
+        flash("Answer submitted.", "success")
+    db.session.commit()
+    return redirect(url_for("student_resources"))
+
+
+@app.route("/student/submissions/<int:submission_id>/download")
+@login_required
+@role_required("student")
+def student_submission_download(submission_id):
+    sub = db.session.get(ActivitySubmission, submission_id)
+    if not sub or sub.student_id != session["user_id"]:
+        flash("Submission not found.", "error")
+        return redirect(url_for("student_resources"))
+    folder = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        "submissions",
+        str(sub.activity_id),
+        str(sub.student_id),
+    )
+    return send_from_directory(
+        folder,
+        sub.stored_filename,
+        as_attachment=True,
+        download_name=sub.original_filename,
+    )
+
+
+def _lecturer_activity_or_none(activity_id: int, lecturer_id: int):
+    activity = db.session.get(ActivityUpload, activity_id)
+    if not activity or activity.lecturer_id != lecturer_id:
+        return None
+    return activity
+
+
+def _submission_counts_for_lecturer(lecturer_id: int) -> dict[int, int]:
+    rows = (
+        db.session.query(ActivitySubmission.activity_id, func.count(ActivitySubmission.id))
+        .join(ActivityUpload, ActivitySubmission.activity_id == ActivityUpload.id)
+        .filter(ActivityUpload.lecturer_id == lecturer_id)
+        .group_by(ActivitySubmission.activity_id)
+        .all()
+    )
+    return {activity_id: count for activity_id, count in rows}
+
+
+def _grades_for_activity_submissions(lecturer_id: int, activity_id: int):
+    """Map submission_id -> GradeEntry for one activity."""
+    submission_ids = [
+        s.id
+        for s in ActivitySubmission.query.filter_by(activity_id=activity_id).all()
+    ]
+    if not submission_ids:
+        return {}
+    grades = GradeEntry.query.filter(
+        GradeEntry.lecturer_id == lecturer_id,
+        GradeEntry.submission_id.in_(submission_ids),
+    ).all()
+    return {g.submission_id: g for g in grades}
+
+
+@app.route("/lecturer/submissions")
+@login_required
+@role_required("lecturer")
+def lecturer_submissions():
+    lecturer_id = session["user_id"]
+    activities = (
+        ActivityUpload.query.filter_by(lecturer_id=lecturer_id)
+        .order_by(ActivityUpload.created_at.desc())
+        .all()
+    )
+    submission_counts = _submission_counts_for_lecturer(lecturer_id)
+
+    return render_template(
+        "lecturer_submissions.html",
+        username=session.get("username"),
+        activities=activities,
+        submission_counts=submission_counts,
+    )
+
+
+@app.route("/lecturer/submissions/activity/<int:activity_id>")
+@login_required
+@role_required("lecturer")
+def lecturer_submissions_activity(activity_id):
+    lecturer_id = session["user_id"]
+    activity = _lecturer_activity_or_none(activity_id, lecturer_id)
+    if not activity:
+        flash("Activity not found.", "error")
+        return redirect(url_for("lecturer_submissions"))
+
+    submissions = (
+        ActivitySubmission.query.filter_by(activity_id=activity_id)
+        .order_by(ActivitySubmission.submitted_at.desc())
+        .all()
+    )
+    students = User.query.filter_by(role="student").all()
+    students_by_id = {u.id: u for u in students}
+    grades_by_submission = _grades_for_activity_submissions(lecturer_id, activity_id)
+
+    return render_template(
+        "lecturer_submissions_activity.html",
+        username=session.get("username"),
+        activity=activity,
+        submissions=submissions,
+        students_by_id=students_by_id,
+        grades_by_submission=grades_by_submission,
+    )
+
+
+@app.route("/lecturer/submissions/activity/<int:activity_id>/grades.csv")
+@login_required
+@role_required("lecturer")
+def lecturer_activity_grades_csv(activity_id):
+    lecturer_id = session["user_id"]
+    activity = _lecturer_activity_or_none(activity_id, lecturer_id)
+    if not activity:
+        flash("Activity not found.", "error")
+        return redirect(url_for("lecturer_submissions"))
+
+    submissions = (
+        ActivitySubmission.query.filter_by(activity_id=activity_id)
+        .order_by(ActivitySubmission.submitted_at.asc())
+        .all()
+    )
+    students_by_id = {u.id: u for u in User.query.filter_by(role="student").all()}
+    grades_by_submission = _grades_for_activity_submissions(lecturer_id, activity_id)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "activity_title",
+            "student_username",
+            "submitted_at",
+            "answer_filename",
+            "score",
+            "max_score",
+            "percentage",
+            "graded_at",
+            "status",
+        ]
+    )
+    for sub in submissions:
+        stu = students_by_id.get(sub.student_id)
+        grade = grades_by_submission.get(sub.id)
+        submitted = (
+            sub.submitted_at.strftime("%Y-%m-%d %H:%M")
+            if sub.submitted_at
+            else ""
+        )
+        if grade:
+            pct = round((grade.score / grade.max_score) * 100, 1) if grade.max_score else ""
+            graded_at = (
+                grade.created_at.strftime("%Y-%m-%d %H:%M")
+                if grade.created_at
+                else ""
+            )
+            writer.writerow(
+                [
+                    activity.title,
+                    stu.username if stu else sub.student_id,
+                    submitted,
+                    sub.original_filename,
+                    grade.score,
+                    grade.max_score,
+                    pct,
+                    graded_at,
+                    "graded",
+                ]
+            )
+        else:
+            writer.writerow(
+                [
+                    activity.title,
+                    stu.username if stu else sub.student_id,
+                    submitted,
+                    sub.original_filename,
+                    "",
+                    "",
+                    "",
+                    "",
+                    "not_graded",
+                ]
+            )
+
+    safe_title = secure_filename(activity.title) or f"activity_{activity_id}"
+    filename = f"grades_{safe_title}.csv"
+    response = make_response("\ufeff" + buf.getvalue())
+    response.headers["Content-Type"] = "text/csv; charset=utf-8"
+    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
+
+
+@app.route("/lecturer/submissions/<int:submission_id>/download")
+@login_required
+@role_required("lecturer")
+def lecturer_submission_download(submission_id):
+    sub = db.session.get(ActivitySubmission, submission_id)
+    if not sub:
+        flash("Submission not found.", "error")
+        return redirect(url_for("lecturer_submissions"))
+    activity = db.session.get(ActivityUpload, sub.activity_id)
+    if not activity or activity.lecturer_id != session["user_id"]:
+        flash("Submission not found.", "error")
+        return redirect(url_for("lecturer_submissions"))
+    folder = os.path.join(
+        app.config["UPLOAD_FOLDER"],
+        "submissions",
+        str(sub.activity_id),
+        str(sub.student_id),
+    )
+    return send_from_directory(
+        folder,
+        sub.stored_filename,
+        as_attachment=True,
+        download_name=sub.original_filename,
+    )
+
+
+@app.route("/lecturer/submissions/<int:submission_id>/grade", methods=["POST"])
+@login_required
+@role_required("lecturer")
+def lecturer_grade_submission(submission_id):
+    lecturer_id = session["user_id"]
+    sub = db.session.get(ActivitySubmission, submission_id)
+    if not sub:
+        flash("Submission not found.", "error")
+        return redirect(url_for("lecturer_submissions"))
+    activity = db.session.get(ActivityUpload, sub.activity_id)
+    if not activity or activity.lecturer_id != lecturer_id:
+        flash("Submission not found.", "error")
+        return redirect(url_for("lecturer_submissions"))
+    activity_url = url_for("lecturer_submissions_activity", activity_id=activity.id)
+
+    score_raw = (request.form.get("score") or "").strip()
+    max_raw = (request.form.get("max_score") or "").strip()
+    try:
+        score = float(score_raw)
+    except ValueError:
+        flash("Score must be a number.", "error")
+        return redirect(activity_url)
+    max_score = 100.0
+    if max_raw != "":
+        try:
+            max_score = float(max_raw)
+        except ValueError:
+            flash("Max score must be a number.", "error")
+            return redirect(activity_url)
+
+    assignment_name = activity.title
+    grade = GradeEntry.query.filter_by(submission_id=submission_id).first()
+    if not grade:
+        grade = GradeEntry.query.filter_by(
+            lecturer_id=lecturer_id,
+            student_id=sub.student_id,
+            assignment_name=assignment_name,
+        ).first()
+    if grade:
+        grade.score = score
+        grade.max_score = max_score
+        grade.submission_id = submission_id
+        grade.created_at = utc_now()
+        flash("Grade updated for this submission.", "success")
+    else:
+        db.session.add(
+            GradeEntry(
+                lecturer_id=lecturer_id,
+                student_id=sub.student_id,
+                assignment_name=assignment_name,
+                score=score,
+                max_score=max_score,
+                submission_id=submission_id,
+            )
+        )
+        flash("Grade saved for this submission.", "success")
+    db.session.commit()
+    return redirect(activity_url)
 
 
 @app.route("/student/assistant/correct", methods=["POST"])

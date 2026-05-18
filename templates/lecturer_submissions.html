@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Grade submissions - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>Grade student submissions</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('lecturer_dashboard') }}">Back</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. Choose an activity to see who submitted answer PDFs and enter grades.</p>
+</div>
+
+<div class="box box--table wide">
+  <h2>Select activity</h2>
+  {% if not activities %}
+  <p class="hint">You have not uploaded any activities yet. <a href="{{ url_for('lecturer_activities') }}">Upload activities</a> first.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Activity</th>
+          <th>Uploaded</th>
+          <th>Submissions</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in activities %}
+        {% set count = submission_counts.get(a.id, 0) %}
+        <tr>
+          <td>{{ a.title }}</td>
+          <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '' }}</td>
+          <td>{{ count }}</td>
+          <td>
+            <a href="{{ url_for('lecturer_submissions_activity', activity_id=a.id) }}">
+              {{ 'Grade & summary' if count else 'View (no submissions yet)' }}
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

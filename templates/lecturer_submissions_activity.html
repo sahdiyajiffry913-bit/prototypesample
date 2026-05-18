@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Grade: {{ activity.title }} - uilingo{% endblock %}
+
+{% block content %}
+<div class="dash-top">
+  <h1>{{ activity.title }}</h1>
+  <div class="dash-links">
+    <a href="{{ url_for('lecturer_submissions') }}">All activities</a>
+    <a href="{{ url_for('lecturer_dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('logout') }}">Log out</a>
+  </div>
+</div>
+
+<div class="box">
+  <p class="hint">Activity PDF: <a href="{{ url_for('lecturer_activity_download', activity_id=activity.id) }}">{{ activity.original_filename }}</a></p>
+</div>
+
+<div class="box box--table wide">
+  <h2>Submissions to grade</h2>
+  {% if not submissions %}
+  <p class="hint">No students have submitted an answer for this activity yet.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Submitted</th>
+          <th>Answer PDF</th>
+          <th>Grade</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sub in submissions %}
+        {% set stu = students_by_id.get(sub.student_id) %}
+        {% set grade = grades_by_submission.get(sub.id) %}
+        <tr>
+          <td>{{ stu.username if stu else sub.student_id }}</td>
+          <td>{{ sub.submitted_at.strftime('%Y-%m-%d %H:%M') if sub.submitted_at else '' }}</td>
+          <td>
+            <a href="{{ url_for('lecturer_submission_download', submission_id=sub.id) }}">
+              {{ sub.original_filename }}
+            </a>
+          </td>
+          <td>
+            <form method="post" action="{{ url_for('lecturer_grade_submission', submission_id=sub.id) }}" class="inline-grade-form">
+              <input type="number" name="score" step="any" required placeholder="Score"
+                value="{{ grade.score if grade else '' }}">
+              <span>/</span>
+              <input type="number" name="max_score" step="any" placeholder="100"
+                value="{{ grade.max_score if grade else '100' }}">
+              <button type="submit">{{ 'Update' if grade else 'Save' }}</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="box box--table wide">
+  <div class="section-head">
+    <h2>Grade summary</h2>
+    {% if submissions %}
+    <a class="btn-secondary" href="{{ url_for('lecturer_activity_grades_csv', activity_id=activity.id) }}">
+      Download CSV
+    </a>
+    {% endif %}
+  </div>
+  {% if not submissions %}
+  <p class="hint">Nothing to summarize yet.</p>
+  {% else %}
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Student</th>
+          <th>Submitted</th>
+          <th>Score</th>
+          <th>Percentage</th>
+          <th>Graded</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sub in submissions %}
+        {% set stu = students_by_id.get(sub.student_id) %}
+        {% set grade = grades_by_submission.get(sub.id) %}
+        <tr>
+          <td>{{ stu.username if stu else sub.student_id }}</td>
+          <td>{{ sub.submitted_at.strftime('%Y-%m-%d %H:%M') if sub.submitted_at else '' }}</td>
+          <td>
+            {% if grade %}
+            {{ grade.score }} / {{ grade.max_score }}
+            {% else %}
+            —
+            {% endif %}
+          </td>
+          <td>
+            {% if grade and grade.max_score %}
+            {{ ((grade.score / grade.max_score) * 100) | round(1) }}%
+            {% else %}
+            —
+            {% endif %}
+          </td>
+          <td>
+            {% if grade and grade.created_at %}
+            {{ grade.created_at.strftime('%Y-%m-%d %H:%M') }}
+            {% else %}
+            —
+            {% endif %}
+          </td>
+          <td>{{ 'Graded' if grade else 'Not graded' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

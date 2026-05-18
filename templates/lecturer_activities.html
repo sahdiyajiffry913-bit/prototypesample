@@ -11,7 +11,7 @@
 </div>
 
 <div class="box">
-  <p class="hint">Logged in as <strong>{{ username }}</strong>. Upload past papers or other PDFs. Only <strong>.pdf</strong> files.</p>
+  <p class="hint">Logged in as <strong>{{ username }}</strong>. Upload assignment PDFs for students to submit answers. Only <strong>.pdf</strong> files. For past papers without submission, use the <a href="{{ url_for('lecturer_pastpapers') }}">Past papers portal</a>.</p>
 
   <form method="post" action="{{ url_for('lecturer_activities') }}" enctype="multipart/form-data">
     <label>

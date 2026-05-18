@@ -1,0 +1,30 @@
+<div class="stats-grid">
+  <section class="stats-card stats-card--progress">
+    <h2 class="stats-card__title">Learning Progress</h2>
+    <p class="stats-card__summary">
+      <strong>{{ submitted_activities }}</strong> of <strong>{{ total_activities }}</strong> activities completed
+    </p>
+    <div class="progress-bar" role="progressbar"
+      aria-valuenow="{{ completion_percentage }}"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-label="Activity completion">
+      <div class="progress-bar__fill" style="width: {{ completion_percentage }}%;"></div>
+    </div>
+    <p class="stats-card__percent">{{ completion_percentage }}% completed</p>
+    {% if total_activities == 0 %}
+    <p class="hint stats-card__note">No activities available yet.</p>
+    {% endif %}
+  </section>
+
+  <section class="stats-card stats-card--performance">
+    <h2 class="stats-card__title">Academic Performance</h2>
+    {% if average_grade_percentage is not none %}
+    <p class="stats-card__grade">
+      Average Grade: <strong>{{ average_grade_percentage }}%</strong>
+    </p>
+    {% else %}
+    <p class="stats-card__empty">No grades available yet</p>
+    {% endif %}
+  </section>
+</div>
